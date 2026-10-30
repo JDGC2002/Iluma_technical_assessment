@@ -1,0 +1,224 @@
+{
+  "review_date": "2026-10-28",
+  "source_file": "data_jobs Data Engineer Assessment.csv",
+  "source_sha256": "635241ed09ccee18bdae1f83b45f26d6759e0aa2513c529f6190e9054062436c",
+  "source_bytes": 231152089,
+  "rows": 785741,
+  "columns": [
+    "job_title_short",
+    "job_title",
+    "job_location",
+    "job_via",
+    "job_schedule_type",
+    "job_work_from_home",
+    "search_location",
+    "job_posted_date",
+    "job_no_degree_mention",
+    "job_health_insurance",
+    "job_country",
+    "salary_rate",
+    "salary_year_avg",
+    "salary_hour_avg",
+    "company_name",
+    "job_skills",
+    "job_type_skills"
+  ],
+  "methods": {
+    "exact_identity": "I hash a JSON array of all 17 decoded CSV fields in a fixed order.",
+    "proposed_identity": "I keep scalar values unchanged, sort and deduplicate skill members, and sort dictionary keys. Missing collections remain null.",
+    "candidate_identity": [
+      "company_name",
+      "job_title",
+      "job_location",
+      "job_posted_date"
+    ],
+    "record_number": "I count CSV data records from 1, excluding the header.",
+    "scope": "I recorded these findings during the source review. I keep execution results in docs/decisions.md."
+  },
+  "exact_duplicate_excess": 101,
+  "exact_duplicate_groups_by_size": {
+    "2": 89,
+    "3": 3,
+    "4": 2
+  },
+  "additional_collection_order_duplicates": 3,
+  "expected_distinct_jobs": 785637,
+  "expected_duplicate_occurrences": 104,
+  "candidate_distinct_keys": 784897,
+  "additional_distinct_observations_lost_by_candidate": 740,
+  "candidate_collision_examples": [
+    {
+      "record_numbers": [
+        3342,
+        18745
+      ],
+      "differing_fields": [
+        "job_skills",
+        "job_type_skills"
+      ]
+    },
+    {
+      "record_numbers": [
+        4459,
+        16950
+      ],
+      "differing_fields": [
+        "job_skills",
+        "job_type_skills"
+      ]
+    },
+    {
+      "record_numbers": [
+        5698,
+        8689
+      ],
+      "differing_fields": [
+        "job_via"
+      ]
+    },
+    {
+      "record_numbers": [
+        6517,
+        8213,
+        14818
+      ],
+      "differing_fields": [
+        "job_no_degree_mention",
+        "job_skills",
+        "job_type_skills"
+      ]
+    },
+    {
+      "record_numbers": [
+        6676,
+        18404
+      ],
+      "differing_fields": [
+        "job_skills",
+        "job_type_skills"
+      ]
+    },
+    {
+      "record_numbers": [
+        11691,
+        16783
+      ],
+      "differing_fields": [
+        "job_skills",
+        "job_type_skills"
+      ]
+    }
+  ],
+  "collection_order_duplicate_pairs": [
+    [
+      226934,
+      237212
+    ],
+    [
+      244296,
+      285061
+    ],
+    [
+      428496,
+      445515
+    ]
+  ],
+  "missing": {
+    "salary_rate": 752674,
+    "salary_year_avg": 763738,
+    "salary_hour_avg": 775079,
+    "job_skills": 117037,
+    "job_type_skills": 117037,
+    "job_location": 1045,
+    "job_schedule_type": 12667,
+    "job_country": 49,
+    "job_via": 8,
+    "job_title": 1,
+    "company_name": 1
+  },
+  "skill_lists_with_repeated_items": 63811,
+  "skills_with_multiple_categories": {
+    "mongodb": {
+      "databases": 18182,
+      "programming": 18182
+    },
+    "ruby": {
+      "programming": 4392,
+      "webframeworks": 4392
+    },
+    "sas": {
+      "analyst_tools": 41702,
+      "programming": 41702
+    },
+    "firebase": {
+      "cloud": 1109,
+      "databases": 1109
+    }
+  },
+  "skills_with_varying_category_sets": {},
+  "distinct_skill_category_pairs": 256,
+  "schedule_tokens": {
+    "Full-time": 716243,
+    "Contractor": 39945,
+    "Temp work": 7914,
+    "Internship": 12077,
+    "Part-time": 15274,
+    "Volunteer": 67,
+    "Per diem": 76,
+    "Pekerjaan tetap": 59,
+    "Kontraktor": 3
+  },
+  "location_labels_with_multiple_nonempty_countries": 1167,
+  "salary_combinations": [
+    {
+      "rate": "",
+      "has_year_average": false,
+      "has_hour_average": false,
+      "count": 752674
+    },
+    {
+      "rate": "year",
+      "has_year_average": true,
+      "has_hour_average": false,
+      "count": 22003
+    },
+    {
+      "rate": "hour",
+      "has_year_average": false,
+      "has_hour_average": true,
+      "count": 10662
+    },
+    {
+      "rate": "month",
+      "has_year_average": false,
+      "has_hour_average": false,
+      "count": 382
+    },
+    {
+      "rate": "day",
+      "has_year_average": false,
+      "has_hour_average": false,
+      "count": 9
+    },
+    {
+      "rate": "week",
+      "has_year_average": false,
+      "has_hour_average": false,
+      "count": 10
+    },
+    {
+      "rate": "year",
+      "has_year_average": false,
+      "has_hour_average": false,
+      "count": 1
+    }
+  ],
+  "invalid_or_nonpositive_salaries": {},
+  "unexpected_row_width": 0,
+  "boundary_whitespace": {
+    "job_title": 11,
+    "company_name": 7
+  },
+  "full_titles_with_multiple_standardized_roles": 0,
+  "ambiguous_role_examples": {}
+}
