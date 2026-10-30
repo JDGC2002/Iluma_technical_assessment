@@ -8,6 +8,8 @@ I chose Python for reading and validating the CSV, PostgreSQL for the relational
 
 For Python, I use the standard CSV and logging modules, Psycopg for the database connection, python-dotenv for configuration, and pytest for tests. SQL checks and database constraints cover the data-quality rules.
 
+I completed the main pipeline and native PostgreSQL checks before adding GitHub Actions.
+
 ## What I found in the file
 
 I reviewed all 785,741 records and 17 columns before choosing the model. The counts and examples are in [data-profile.json](data-profile.json).
@@ -146,6 +148,12 @@ I read the file in batches and use COPY for staging, following the [PostgreSQL b
 My tests cover parsing, fingerprints, missing and empty values, file paths, batch sizes, new entities, repeated and overlapping files, nullable locations, conflicts, and failed loads followed by retries. Database tests use a separate test database. I also included a concurrent-writer test for native PostgreSQL.
 
 I log the current step, counts, time spent, and the reason for a failure. Those messages stay short so I can follow a run without reading a long explanation. Credentials stay out of the logs.
+
+## Continuous integration
+
+I use GitHub Actions to run lint, formatting, and all 33 test cases on pull requests and pushes to `main`, with a manual trigger available too. Each run starts a temporary PostgreSQL 18.6 service and uses small CSV fixtures. This lets me check the actual COPY and transaction behavior on every change. The workflow checks that `TEST_DATABASE_URL` is set before running pytest, so the database cases cannot silently skip because that setting is missing.
+
+I keep the full-file load and Docker Compose restart results below as separate manual checks; the CI service does not execute Compose or load the assessment CSV.
 
 ## Earlier embedded checks on October 29, 2026
 
