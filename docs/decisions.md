@@ -72,3 +72,38 @@ For a readable file, I finish staging all records and store any row errors. If I
 I also stop publication when a full title has conflicting standardized titles or a known skill has conflicting classifications. The staged records remain available, and the source-file entry explains the conflict.
 
 I chose to publish a complete file at a time because this assessment gives me one file as a unit of work. A failed load leaves the previous successful data available. In operations, I would alert on the failure, inspect the staged data, fix the source or rule, and retry. A database connection issue may be worth an automatic retry. Invalid source data needs a correction first. This choice can delay fresh data, but it keeps an incomplete file from looking like a successful load.
+
+## Relational model
+
+I keep the relationships in the [ER diagram](er-model.md) and the table definitions in [schema.sql](../sql/schema.sql).
+
+- I store full and standardized titles together in `job_titles`. The dictionary describes this dependency, and the file supports it. For a missing full title, I allow one entry per standardized title.
+- I group company and platform names using trimmed lowercase keys, while keeping a readable source spelling. A name can belong to several businesses, so this grouping cannot establish legal company identity. I leave legal suffixes and similar names alone.
+- For platforms, I remove the leading `via ` text and keep the rest of the name, including geographic variants.
+- I identify a location by its label and reported country. `UNIQUE NULLS NOT DISTINCT` prevents duplicates when one component is missing. If both are missing, the job has a null location reference.
+- I keep `search_location` on the job because it describes how the data was collected. It does not establish the job's actual location.
+- I use junction tables for job/skill, skill/category, and job/schedule relationships. A composite primary key keeps each pair unique.
+- I store the shared skill classification once because each skill has the same category set throughout this file. A later change to a known skill's classification needs review before I update the rule or model.
+- I split schedule combinations using the separators found in the source. The result contains nine labels. I preserve the untranslated labels until I have a reason to map them.
+- I preserve skill spelling and punctuation, including the separate values `mongo`, `mongodb`, `c#`, and `c++`.
+- I keep salary values and boolean flags on the job because they describe that record. A repeated scalar value alone does not need its own table.
+
+| Source field | Destination |
+| --- | --- |
+| job_title_short | job_titles.short_title |
+| job_title | job_titles.full_title |
+| company_name | companies |
+| job_location | locations.label |
+| job_country | countries, referenced by locations |
+| job_via | platforms |
+| job_schedule_type | schedule_types and job_schedules |
+| job_skills | skills and job_skills |
+| job_type_skills | skill_categories and skill_category_memberships |
+| search_location | jobs.search_location |
+| job_posted_date | jobs.job_posted_date |
+| job_work_from_home | jobs.job_work_from_home |
+| job_no_degree_mention | jobs.job_no_degree_mention |
+| job_health_insurance | jobs.job_health_insurance |
+| salary_rate | jobs.salary_rate |
+| salary_year_avg | jobs.salary_year_avg |
+| salary_hour_avg | jobs.salary_hour_avg |
