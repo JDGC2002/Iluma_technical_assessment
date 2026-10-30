@@ -85,6 +85,8 @@ python -m pytest -q
 
 The cases cover repeated and overlapping files, new entities, missing and empty skills, invalid input, conflicting classifications, and rollback followed by retry. There is also a test for two loads running at the same time. Database tests are skipped when `TEST_DATABASE_URL` is not set.
 
+I run the same lint, formatting, and test checks in [GitHub Actions](docs/github-actions.md), using Python 3.12 and a temporary PostgreSQL database.
+
 ## What I checked
 
 I ran the complete file through native PostgreSQL 18.6 in Docker on October 29, 2026. The pipeline used COPY and published 785,637 distinct job records from 785,741 source records, with 104 duplicate occurrences, 3,594,662 job-skill relationships, and no invalid rows. All data-quality checks passed.
