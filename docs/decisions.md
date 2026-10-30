@@ -138,3 +138,11 @@ I configure `INPUT_FILE`, `BATCH_SIZE`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRE
 For PostgreSQL, I use the official `postgres:18.6-bookworm` image, a named volume at `/var/lib/postgresql`, a localhost port mapping, and a TCP readiness check. Python runs outside the container, so Compose only needs the database service. I keep the default database settings until measurements give me a reason to change them.
 
 I based this setup on the [official image documentation](https://hub.docker.com/_/postgres), [Compose startup guidance](https://docs.docker.com/compose/how-tos/startup-order/), and [environment variable documentation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/). PostgreSQL applies its initialization settings to an empty data directory. Changing `.env` later does not rename an existing database or rotate its password.
+
+## Performance and tests
+
+I read the file in batches and use COPY for staging, following the [PostgreSQL bulk-loading guidance](https://www.postgresql.org/docs/18/populate.html) and [Psycopg COPY documentation](https://www.psycopg.org/psycopg3/docs/basic/copy.html). SQL handles the transformations as sets of rows. Python only needs the current batch in memory, and database integrity and durability checks stay enabled.
+
+My tests cover parsing, fingerprints, missing and empty values, file paths, batch sizes, new entities, repeated and overlapping files, nullable locations, conflicts, and failed loads followed by retries. Database tests use a separate test database. I also included a concurrent-writer test for native PostgreSQL.
+
+I log the current step, counts, time spent, and the reason for a failure. Those messages stay short so I can follow a run without reading a long explanation. Credentials stay out of the logs.
