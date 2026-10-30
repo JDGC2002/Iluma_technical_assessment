@@ -146,3 +146,52 @@ I read the file in batches and use COPY for staging, following the [PostgreSQL b
 My tests cover parsing, fingerprints, missing and empty values, file paths, batch sizes, new entities, repeated and overlapping files, nullable locations, conflicts, and failed loads followed by retries. Database tests use a separate test database. I also included a concurrent-writer test for native PostgreSQL.
 
 I log the current step, counts, time spent, and the reason for a failure. Those messages stay short so I can follow a run without reading a long explanation. Credentials stay out of the logs.
+
+## Earlier embedded checks on October 29, 2026
+
+I validated the configuration with Docker Compose 5.6.1. The full-file Python check read all 785,741 records without validation errors and produced 785,637 distinct fingerprints, including 104 duplicate occurrences.
+
+I then ran the complete transformation on PGlite, an embedded PostgreSQL 18.6 build. Its socket COPY protocol did not work with Psycopg in this environment, so I used a local adapter with batched INSERT to check the database logic. That adapter and its dependencies stay outside this project. The pipeline uses Psycopg COPY.
+
+| Check | Observed result |
+| --- | --- |
+| Jobs after the complete load | 785,637 |
+| Job/skill relationships | 3,594,662 |
+| Invalid source records | 0 |
+| Duplicate source occurrences | 104 |
+| Loading the same file again | Skipped, with no added records. |
+| Data-quality queries | All passed. |
+| Full-file parser time | 45.91 seconds |
+| Embedded database staging time | 89.17 seconds |
+| Embedded database publication time | 193.54 seconds |
+| Embedded load, quality checks, and repeat check | 294.77 seconds |
+
+I passed 35 Python tests and 11 database behavior tests using the local adapter, along with Ruff's lint and formatting checks. The database cases include new entities, missing and empty collections, overlapping files, invalid rows, changed input during ingestion, classification conflicts, and publication rollback followed by retry.
+
+At that point, Docker startup, native COPY, and concurrent sessions remained unverified. Docker Desktop was unavailable on that PC, and Windows Application Control blocked the portable PostgreSQL executable. The following native run closes those gaps.
+
+## Native PostgreSQL checks on October 29, 2026
+
+I created a new Python environment on Windows 11 Pro and installed the pinned project dependencies. I extracted the supplied CSV and verified its SHA-256 against the manifest before loading it. I used Python 3.14.4, Psycopg 3.3.6, Docker Engine 28.0.4, Docker Compose 2.34.0, and the existing `postgres:18.6-bookworm` image. The running server reported PostgreSQL 18.6. Docker had 12 logical CPUs and about 17.15 GiB of memory available on an Intel Core i5-1335U PC.
+
+I ran `docker compose up -d --wait`, then the pipeline's `init`, `load`, and `check` commands. The database became healthy and the full load used native Psycopg COPY with a batch size of 10,000. I used the existing code and default PostgreSQL settings without an adapter or changes to the implementation.
+
+| Check | Observed result |
+| --- | ---: |
+| Source records | 785,741 |
+| Distinct jobs | 785,637 |
+| Duplicate source occurrences | 104 |
+| Job/skill relationships | 3,594,662 |
+| Invalid source records | 0 |
+| Native staging time | 198.20 seconds |
+| Native publication time | 320.82 seconds |
+
+All data-quality queries passed. These timings describe one full-file run on this PC; I do not treat them as a comparison with the earlier embedded run, which used different hardware and a different staging method.
+
+I created a separate `jobs_test` database, set `TEST_DATABASE_URL` to that database, and ran the full pytest suite with `-q`. All 47 cases passed in 5.13 seconds: 35 unit cases and 12 database cases. This includes native COPY, concurrent writers, later loads with new entities, invalid rows, conflicting mappings, and rollback followed by retry. The test fixture cleared only the test database's pipeline tables. `ruff check jobs_pipeline tests` and `ruff format --check jobs_pipeline tests` also passed.
+
+I then reviewed the suite and removed overlapping unit tests and repetitive input examples. The final suite has 18 functions expanded into 33 cases: 21 unit cases and the same 12 database cases. I strengthened the existing checks for original source values, null versus false, preservation of previous data after rollback, and unchanged data when another writer holds the lock. All 33 cases passed on native PostgreSQL in 4.68 seconds, and Ruff's lint and formatting checks passed. These changes affect tests only; the ingestion and transformation rules remain unchanged.
+
+I repeated the same file through `load_file` with batch size 777. It returned `skipped = true` and `new_jobs = 0` in 0.36 seconds. Before and after the repeat, I counted and hashed all 14 core and staging tables using binary COPY exports ordered by each table's primary key. Every count and SHA-256 digest matched, including the job IDs, relationships, original source records, and file metadata.
+
+I then ran `docker compose restart db` and `docker compose up -d --wait db`. The container became healthy again. I repeated the table comparisons and quality checks: all contents and IDs were unchanged, and all quality checks passed. This verified persistence in the named volume across a container restart.
