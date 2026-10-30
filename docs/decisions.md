@@ -107,3 +107,34 @@ I keep the relationships in the [ER diagram](er-model.md) and the table definiti
 | salary_rate | jobs.salary_rate |
 | salary_year_avg | jobs.salary_year_avg |
 | salary_hour_avg | jobs.salary_hour_avg |
+
+## New entities in later files
+
+I discover entities on every load. Before inserting jobs and their relationships, I insert any new skills, categories, platforms, companies, titles, locations, and schedules found in that file. Their IDs come from the database.
+
+A new skill or platform is a normal addition. A conflicting classification of an existing entity is a different issue and follows the validation rule above.
+
+## Staging, transactions, and retries
+
+I keep file information in `staging.source_files` and each source occurrence in `staging.jobs`. The record number counts CSV records, excluding the header. This stays useful even when a quoted field spans several physical lines.
+
+Each staged row holds the original record, parsed skill fields, fingerprint, any row error, and the job reference after publication. That gives me a way to trace a job back to its source and inspect a failed load.
+
+I use two transactions:
+
+1. I stage a new or incomplete file using configurable batches and COPY. Before accepting this stage, I check the file hash again to catch a file changed during the read.
+2. I validate the shared mappings, insert entities and jobs, create relationships, link the staged records, check the counts, and mark the file complete. These publication steps commit together.
+
+If publication fails, I roll it back and keep staging for review. Batch size controls memory use and loading buffers. It does not split publication into partially committed results.
+
+I use a file hash to skip completed files, including renamed copies. A different file may add source references while reusing existing jobs. An edited record gets a new fingerprint and keeps its own identity.
+
+I allow one writer at a time with a PostgreSQL session advisory lock. Unique constraints and explicit conflict targets handle expected duplicates. Other constraint errors stay visible. If I change the transformation rules later, I need a planned rebuild or migration before reprocessing completed files.
+
+## Configuration and Docker
+
+I configure `INPUT_FILE`, `BATCH_SIZE`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, and `POSTGRES_PORT` in `.env`. Existing environment variables take priority. Relative input paths start from the environment file's folder. My committed `.env.example` has an empty password placeholder.
+
+For PostgreSQL, I use the official `postgres:18.6-bookworm` image, a named volume at `/var/lib/postgresql`, a localhost port mapping, and a TCP readiness check. Python runs outside the container, so Compose only needs the database service. I keep the default database settings until measurements give me a reason to change them.
+
+I based this setup on the [official image documentation](https://hub.docker.com/_/postgres), [Compose startup guidance](https://docs.docker.com/compose/how-tos/startup-order/), and [environment variable documentation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/). PostgreSQL applies its initialization settings to an empty data directory. Changing `.env` later does not rename an existing database or rotate its password.
