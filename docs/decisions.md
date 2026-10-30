@@ -8,7 +8,7 @@ I chose Python for reading and validating the CSV, PostgreSQL for the relational
 
 For Python, I use the standard CSV and logging modules, Psycopg for the database connection, python-dotenv for configuration, and pytest for tests. SQL checks and database constraints cover the data-quality rules.
 
-I completed the main pipeline and native PostgreSQL checks before adding GitHub Actions.
+I completed the main pipeline and native PostgreSQL checks before adding GitHub Actions. I also describe a conceptual analytical model in the README. Orchestration remains outside the current implementation, and the analytical tables are a proposal.
 
 ## What I found in the file
 
@@ -154,6 +154,42 @@ I log the current step, counts, time spent, and the reason for a failure. Those 
 I use GitHub Actions to run lint, formatting, and all 33 test cases on pull requests and pushes to `main`, with a manual trigger available too. Each run starts a temporary PostgreSQL 18.6 service and uses small CSV fixtures. This lets me check the actual COPY and transaction behavior on every change. The workflow checks that `TEST_DATABASE_URL` is set before running pytest, so the database cases cannot silently skip because that setting is missing.
 
 I keep the full-file load and Docker Compose restart results below as separate manual checks; the CI service does not execute Compose or load the assessment CSV.
+
+## Analytical model proposal
+
+I describe the proposed star schema in the [README](../README.md#conceptual-analytical-model). I would build it from the published 3NF tables, where validation and deduplication have already finished. The following choices explain how I would keep the dashboard consistent with those rules.
+
+### Grain and later loads
+
+I would keep one fact per distinct `core.jobs` record, with `record_hash` unique and `job_id` retained for traceability. A repeated file or another source occurrence would not create a new fact. A changed source record would keep its separate identity under the existing fingerprint rule. Without a listing ID, I cannot establish that it updates an earlier vacancy or infer when a vacancy closed.
+
+I would load new dimension members before the facts and keep each job/skill pair unique in the bridge. This would let later loads add companies, platforms, skills, and postings without changing the fact grain.
+
+### Dimension attributes and missing values
+
+I would put the full and standardized titles together in `dim_job_title`, and the location label and country together in `dim_location`. These attributes belong together for dashboard filters, even though country has its own table in the 3NF model. `dim_date` would describe the posting date; I would retain the original timestamp on the fact without inventing a time zone. I would keep `search_location` as collection context rather than use it to fill a missing job location.
+
+I would use an explicit `Unknown` member for a missing optional dimension so those postings remain in dashboard totals. Partial information would stay available: a posting with a known country and no location label would retain that country, and a missing full title would retain its standardized title.
+
+### Measures and salary limits
+
+I would count postings with `posting_count = 1` at the fact grain. I would also report salary coverage as the number of postings with a non-null salary divided by the number of postings in the same filtered population, separately for annual and hourly values.
+
+I would retain the source salary values and `salary_rate`, with nulls preserved. These are reported amounts, so adding them would not describe a payroll total. Before enabling salary averages or medians, I would need confirmed comparable currencies and pay periods. A country filter alone would not resolve the missing currency information.
+
+### Skills and other relationships with several values
+
+I would give `bridge_job_skill` a unique `(job_id, skill_id)` pair. For example, one posting mentioning Python and SQL would contribute one posting to each skill. Adding those skill counts would produce two mentions but still only one posting. I would label that metric as postings mentioning a skill and calculate overall totals from the facts.
+
+For a selection covering several skills, I would filter facts through `EXISTS` or a distinct set of job IDs before aggregating. Counting distinct jobs after a bridge join would fix the count but leave salary values repeated. `AVG(DISTINCT salary_year_avg)` would also be wrong: different postings can legitimately report the same salary.
+
+If the dashboard needed schedule filters, I would add a separate job/schedule bridge because a posting can have several schedules. A skill-category filter would use the existing skill/category memberships; I would not assign a single category to each skill. I would apply the same fact-filtering rule to these relationships to avoid multiplying records when filters are combined.
+
+### Boolean flags
+
+I would combine the three source flags and the two skill-presence indicators in `dim_job_flags`. This junk dimension would hold the combinations that actually appear in the data. I would preserve true, false, and unknown for each nullable source flag, while keeping the presence indicators as booleans. That lets me distinguish missing skill information from an explicit empty collection when both produce zero skill links.
+
+I based the bridge and flag grouping on Kimball's guidance on [multivalued dimensions](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/multivalued-dimension-bridge-table/) and [junk dimensions](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/junk-dimension/). The source limitations and the existing fingerprint rule determine the grain and measures I would use here.
 
 ## Earlier embedded checks on October 29, 2026
 

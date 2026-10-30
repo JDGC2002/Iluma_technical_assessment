@@ -98,3 +98,56 @@ I repeated the load with batch size 777 and confirmed that it was skipped. I com
 ## Limits of the source
 
 I count distinct source records. Without a listing ID or URL, I cannot reliably count unique real-world vacancies. I also keep the supplied salary values without assuming a currency or filling in missing amounts. Location and classification conflicts need review before I change their meaning.
+
+## Conceptual analytical model
+
+For a BI dashboard, I would build the following star schema from the published 3NF tables. This is a design proposal; the analytical tables are not implemented.
+
+### Fact table and grain
+
+I would use `fact_job_posting`, with one row per distinct source record in `core.jobs`. I would keep `job_id` for tracing the record and make `record_hash` unique so repeated loads cannot add the same fact again. The fact would reference the dimensions below and retain the original posting timestamp. I would count source postings under the same rule I use in the relational model.
+
+```mermaid
+erDiagram
+    dim_date ||..o{ fact_job_posting : dates
+    dim_company ||..o{ fact_job_posting : identifies
+    dim_job_title ||..o{ fact_job_posting : describes
+    dim_location ||..o{ fact_job_posting : locates
+    dim_platform ||..o{ fact_job_posting : publishes
+    dim_job_flags ||..o{ fact_job_posting : describes
+    fact_job_posting ||--o{ bridge_job_skill : lists
+    dim_skill ||--o{ bridge_job_skill : appears_in
+```
+
+### Dimensions
+
+| Dimension | What I would include |
+| --- | --- |
+| `dim_date` | Posting date, month, quarter, and year. |
+| `dim_company` | Company name under the existing identity rule. |
+| `dim_job_title` | Full title and standardized title, so I can report by either. |
+| `dim_location` | Reported location and country together for easier filtering. |
+| `dim_platform` | Platform where the posting appeared. |
+| `dim_skill` | One row per skill, connected through `bridge_job_skill`. |
+| `dim_job_flags` | Observed combinations of the three source flags and the two skill-presence indicators. |
+
+I would use an `Unknown` member when an optional dimension is missing, while keeping any available detail, such as a known country with a missing location label. I would keep `search_location` separately on the fact as collection context.
+
+### Measures
+
+| Measure | How I would use it |
+| --- | --- |
+| `posting_count = 1` | Sum it at the fact grain to count postings by date, role, company, location, or platform. |
+| `salary_year_avg` | Keep the supplied annual value, including nulls. |
+| `salary_hour_avg` | Keep the supplied hourly value separately, including nulls. |
+| Salary coverage | Derive the count and percentage of postings with a supplied salary, separately for annual and hourly values. |
+
+I would not sum salaries or replace missing values with zero. Before comparing salaries or calculating averages, I would confirm that their currencies and pay periods are comparable. The source has no currency field, and country alone does not establish one.
+
+### Skills and boolean flags
+
+I would give `bridge_job_skill` one row per distinct job and skill. A posting with Python and SQL would count once under each skill, so skill totals overlap. For a filter covering several skills, I would first select distinct job IDs, then calculate counts and salary metrics from the matching facts. This prevents a bridge join from repeating a posting's salary.
+
+I would use `dim_job_flags` as a junk dimension: one row per observed combination of `job_work_from_home`, `job_no_degree_mention`, `job_health_insurance`, `skills_reported`, and `skill_categories_reported`. For the three nullable source flags, I would preserve true, false, and unknown. The presence indicators would still distinguish missing skill information from an explicitly empty collection, even when neither has bridge rows.
+
+I explain the aggregation rules and possible schedule and category filters in the [analytical design decisions](docs/decisions.md#analytical-model-proposal).
